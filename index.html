@@ -184,7 +184,8 @@ var S = {
   code: '', cls: '', round: '',
   id: '', name: '',
   items: [], idx: 0, details: [], startedAt: 0,
-  heard: '', busy: false
+  heard: '', busy: false,
+  sid: 0, rec: null      // sid: 응시 세션 번호(학생이 바뀔 때마다 증가)
 };
 
 /* iOS 사파리에서 :active 효과를 켜기 위한 빈 리스너 */
@@ -315,8 +316,11 @@ document.getElementById('btnYes').onclick = function() {
   err('msgConfirm', '');
 
   call('start', { round: S.round }).then(function(d) {
+    stopRec();
+    S.sid++;                         // 새 응시 세션 시작
     S.items = d.items;
     S.details = []; S.idx = 0;
+    S.heard = ''; S.busy = false;
     S.startedAt = Date.now();
     show('s-test');
     render();
@@ -349,7 +353,10 @@ function render() {
   document.getElementById('typeArea').style.display  = voice ? 'none' : 'block';
   document.getElementById('heard').textContent = '—';
   document.getElementById('inAns').value = '';
-  document.getElementById('btnMic').textContent = '🎤 눌러서 말하기';
+  var mic = document.getElementById('btnMic');
+  mic.disabled = false;
+  mic.classList.remove('rec');
+  mic.textContent = '🎤 눌러서 말하기';
 
   document.getElementById('qhint').textContent =
     voice   ? '마이크 버튼을 누르고 단어를 읽으세요' :
@@ -370,28 +377,45 @@ var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 document.getElementById('btnMic').onclick = function() {
   if (!SR) { err('msgTest', '이 브라우저는 음성인식을 지원하지 않습니다.'); return; }
   var btn = this;
+  var mySid = S.sid;                 // 이 인식이 속한 학생
   var rec = new SR();
+  S.rec = rec;
   rec.lang = 'en-US';
   rec.interimResults = true;
   rec.maxAlternatives = 1;
 
   rec.onstart = function() {
+    if (mySid !== S.sid) return;
     btn.disabled = true; btn.classList.add('rec');
     btn.textContent = '🔴 듣는 중…';
     document.getElementById('heard').textContent = '…';
   };
   rec.onresult = function(e) {
+    if (mySid !== S.sid) return;
     var r = e.results[e.results.length - 1];
     document.getElementById('heard').textContent = r[0].transcript;
     if (r.isFinal) S.heard = r[0].transcript;
   };
-  rec.onerror = function(e) { err('msgTest', '인식 오류: ' + e.error); };
+  rec.onerror = function(e) {
+    if (mySid !== S.sid) return;
+    err('msgTest', '인식 오류: ' + e.error);
+  };
   rec.onend = function() {
+    if (S.rec === rec) S.rec = null;
+    if (mySid !== S.sid) return;     // 학생이 바뀌었으면 화면을 건드리지 않음
     btn.disabled = false; btn.classList.remove('rec');
-    btn.textContent = '🎤 다시 말하기';
+    btn.textContent = S.heard ? '🎤 다시 말하기' : '🎤 눌러서 말하기';
   };
   try { rec.start(); } catch (e) { err('msgTest', e.message); }
 };
+
+/* 진행 중인 인식을 강제로 중단 */
+function stopRec() {
+  if (S.rec) {
+    try { S.rec.abort(); } catch (e) {}
+    S.rec = null;
+  }
+}
 
 /* --- 제출 --- */
 document.getElementById('btnNext').onclick = function() {
@@ -405,12 +429,14 @@ document.getElementById('btnNext').onclick = function() {
 
   S.busy = true;
   busyBtn(this, '채점 중…');
+  var mySid = S.sid;
 
   call('grade', {
     answer: given, truth: it.answer, allow: it.allow,
     prompt: it.prompt, kind: it.kind, type: it.type
   })
     .then(function(d) {
+      if (mySid !== S.sid) return;   // 이미 다른 학생으로 넘어감
       S.details.push({
         kind: it.kind, type: it.type, prompt: it.prompt,
         answer: it.answer, given: given,
@@ -423,6 +449,7 @@ document.getElementById('btnNext').onclick = function() {
       else { submitAll(); }
     })
     .catch(function(e) {
+      if (mySid !== S.sid) return;
       S.busy = false;
       var nx = document.getElementById('btnNext');
       nx.disabled = false;
@@ -433,6 +460,7 @@ document.getElementById('btnNext').onclick = function() {
 
 /* ===== 5. 제출 & 복귀 ===== */
 function submitAll() {
+  stopRec();
   show('s-done');
   var ok   = S.details.filter(function(d) { return d.correct === true; }).length;
   var wait = S.details.filter(function(d) { return d.correct === null; }).length;
