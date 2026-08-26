@@ -414,7 +414,8 @@ document.getElementById('btnNext').onclick = function() {
       S.details.push({
         kind: it.kind, type: it.type, prompt: it.prompt,
         answer: it.answer, given: given,
-        correct: d.correct, reason: d.reason
+        correct: (d.correct === null || d.correct === undefined) ? null : d.correct,
+        reason: d.reason
       });
       S.idx++;
       S.busy = false;
@@ -433,11 +434,16 @@ document.getElementById('btnNext').onclick = function() {
 /* ===== 5. 제출 & 복귀 ===== */
 function submitAll() {
   show('s-done');
-  var ok = S.details.filter(function(d) { return d.correct; }).length;
-  var all = S.details.length;
-  document.getElementById('doneIcon').textContent = (ok === all) ? '✓' : '○';
+  var ok   = S.details.filter(function(d) { return d.correct === true; }).length;
+  var wait = S.details.filter(function(d) { return d.correct === null; }).length;
+  var all  = S.details.length;
+
+  document.getElementById('doneIcon').textContent =
+    wait ? '⋯' : (ok === all ? '✓' : '○');
   document.getElementById('doneText').textContent = '제출 완료';
-  document.getElementById('doneSub').textContent = ok + ' / ' + all + ' 정답';
+  document.getElementById('doneSub').textContent =
+    wait ? '채점 중인 문항이 ' + wait + '개 있습니다'
+         : ok + ' / ' + all + ' 정답';
 
   call('submit', {
     round: S.round, id: S.id, name: S.name, cls: S.cls,
