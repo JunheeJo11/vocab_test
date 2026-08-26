@@ -88,6 +88,20 @@
   .cf-no { background: #e8e8ed; color: #444; }
   .cf-yes { background: #1a73e8; color: #fff; }
   .cf-yes:disabled { background: #8fb4ea; }
+
+  /* 교사용 숨김 버튼 */
+  .gear { position: fixed; right: 10px; bottom: 10px;
+          width: 46px; height: 46px; border-radius: 50%;
+          background: transparent; color: #c8c8cd; font-size: 20px;
+          display: none; align-items: center; justify-content: center;
+          padding: 0; }
+  .gear.on { display: flex; }
+  .gear.hold { color: #1a73e8; transform: scale(1.15); }
+  .ovl { position: fixed; inset: 0; background: rgba(0,0,0,.45);
+         display: none; align-items: center; justify-content: center;
+         padding: 20px; z-index: 50; }
+  .ovl.on { display: flex; }
+  .ovl .card { width: 100%; max-width: 360px; margin: 0; }
 </style>
 </head>
 <body>
@@ -124,7 +138,6 @@
     <h1 id="pickTitle">학번을 선택하세요</h1>
     <div class="sub">본인의 번호와 이름을 누르세요</div>
     <div class="grid g3" id="stuList"></div>
-    <button class="btn sub2" id="btnBack" style="margin-top:20px;">반·회차 다시 선택</button>
   </div>
 
   <!-- 3-1. 본인 확인 -->
@@ -175,6 +188,19 @@
 
 </div>
 
+<button class="gear" id="btnGear" title="교사용">&#9881;</button>
+
+<div class="ovl" id="ovlTeacher">
+  <div class="card">
+    <h1 style="font-size:18px;">교사용 코드</h1>
+    <div class="sub" style="margin-bottom:14px;">반·회차를 다시 선택하려면 코드를 입력하세요</div>
+    <input type="password" id="inGear" placeholder="코드">
+    <button class="btn" id="btnGearOk">확인</button>
+    <button class="btn sub2" id="btnGearNo">취소</button>
+    <div class="msg err" id="msgGear"></div>
+  </div>
+</div>
+
 <script>
 /* ===== 설정 ===== */
 var API = 'https://script.google.com/macros/s/AKfycbxZmqxYPwDhyaYBAW58gTV5USYEEZ1xLDGbCv3FArF2094jVvA5u5E6RRAGDCBh9sgg4w/exec';
@@ -208,6 +234,8 @@ function show(id) {
   var all = document.querySelectorAll('.screen');
   for (var i = 0; i < all.length; i++) all[i].classList.remove('on');
   document.getElementById(id).classList.add('on');
+  var g = document.getElementById('btnGear');
+  if (g) g.classList.toggle('on', id === 's-pick');
 }
 function err(elId, m) {
   var el = document.getElementById(elId);
@@ -296,7 +324,43 @@ function loadRoster() {
       '<div style="grid-column:1/-1;color:#c00;">' + e.message + '</div>';
   });
 }
-document.getElementById('btnBack').onclick = function() { show('s-setup'); };
+/* ===== 교사용 숨김 진입 (길게 누르기 3초) ===== */
+var HOLD_MS = 3000;
+var holdTimer = null;
+var gear = document.getElementById('btnGear');
+
+function holdStart(e) {
+  e.preventDefault();
+  gear.classList.add('hold');
+  holdTimer = setTimeout(function() {
+    gear.classList.remove('hold');
+    document.getElementById('inGear').value = '';
+    err('msgGear', '');
+    document.getElementById('ovlTeacher').classList.add('on');
+  }, HOLD_MS);
+}
+function holdEnd() {
+  gear.classList.remove('hold');
+  if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+}
+gear.addEventListener('touchstart', holdStart, { passive: false });
+gear.addEventListener('mousedown', holdStart);
+['touchend', 'touchcancel', 'mouseup', 'mouseleave'].forEach(function(ev) {
+  gear.addEventListener(ev, holdEnd);
+});
+
+document.getElementById('btnGearNo').onclick = function() {
+  document.getElementById('ovlTeacher').classList.remove('on');
+};
+document.getElementById('btnGearOk').onclick = function() {
+  var v = document.getElementById('inGear').value.trim();
+  if (v !== S.code) { err('msgGear', '코드가 올바르지 않습니다.'); return; }
+  document.getElementById('ovlTeacher').classList.remove('on');
+  show('s-setup');
+};
+document.getElementById('inGear').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('btnGearOk').click();
+});
 
 /* ===== 3-1. 본인 확인 ===== */
 function askConfirm(st) {
