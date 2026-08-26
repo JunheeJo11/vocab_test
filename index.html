@@ -3,135 +3,404 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>음성인식 진단</title>
+<title>단어 시험</title>
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-         padding: 16px; margin: 0; background: #f5f5f7; }
-  h2 { font-size: 18px; margin: 0 0 12px; }
-  .box { background: #fff; border-radius: 10px; padding: 14px;
-         margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
-  .row { display: flex; justify-content: space-between;
-         padding: 5px 0; font-size: 14px; border-bottom: 1px solid #eee; }
-  .row:last-child { border-bottom: none; }
-  .k { color: #666; }
-  .v { font-weight: 600; text-align: right; word-break: break-all; }
-  .ok { color: #0a7d2b; }
-  .no { color: #c00; }
-  button { width: 100%; padding: 14px; font-size: 16px; font-weight: 600;
-           border: none; border-radius: 10px; background: #1a73e8;
-           color: #fff; margin-bottom: 8px; }
-  button:disabled { background: #aaa; }
-  #result { font-size: 22px; font-weight: 700; min-height: 34px;
-            padding: 10px; background: #fffbe6; border-radius: 8px; }
-  #score { font-size: 13px; color: #666; margin-top: 6px; }
-  #log { font-family: monospace; font-size: 12px; white-space: pre-wrap;
-         background: #1e1e1e; color: #ddd; padding: 10px;
-         border-radius: 8px; height: 200px; overflow-y: auto; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+         margin: 0; background: #f2f2f7; color: #111;
+         -webkit-user-select: none; user-select: none;
+         overscroll-behavior: none; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 20px; }
+  .screen { display: none; }
+  .screen.on { display: block; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: #666; font-size: 14px; margin-bottom: 20px; }
+  .card { background: #fff; border-radius: 14px; padding: 20px;
+          box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 14px; }
+  input[type=text], input[type=password] {
+    width: 100%; padding: 14px; font-size: 17px;
+    border: 1.5px solid #d0d0d5; border-radius: 10px; }
+  button { border: none; border-radius: 12px; font-weight: 600;
+           font-family: inherit; cursor: pointer; }
+  .btn { width: 100%; padding: 16px; font-size: 17px;
+         background: #1a73e8; color: #fff; margin-top: 10px; }
+  .btn:disabled { background: #b8b8bd; }
+  .btn.sub2 { background: #e8e8ed; color: #333; }
+  .grid { display: grid; gap: 10px; }
+  .g2 { grid-template-columns: repeat(2, 1fr); }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  .g4 { grid-template-columns: repeat(4, 1fr); }
+  .chip { padding: 18px 8px; font-size: 17px; background: #fff;
+          border: 1.5px solid #d0d0d5; border-radius: 12px; text-align: center; }
+  .chip.done { background: #f0f0f2; color: #b0b0b5;
+               text-decoration: line-through; border-color: #e5e5ea; }
+  .stu { padding: 16px 8px; font-size: 16px; }
+  .stu .no { display: block; font-size: 12px; color: #888; margin-bottom: 3px; }
+  .prog { font-size: 13px; color: #666; margin-bottom: 8px; }
+  .qtag { display: inline-block; font-size: 12px; font-weight: 700;
+          padding: 5px 12px; border-radius: 20px; margin-bottom: 14px; }
+  .t-발음 { background: #fde8e8; color: #c0392b; }
+  .t-뜻   { background: #e3f0fd; color: #1a5fb4; }
+  .t-해석 { background: #e6f6ea; color: #1a7f37; }
+  .q { font-size: 30px; font-weight: 700; line-height: 1.4;
+       margin-bottom: 6px; word-break: keep-all; }
+  .q.small { font-size: 22px; }
+  .hint { font-size: 14px; color: #777; margin-bottom: 18px; }
+  .mic { width: 100%; padding: 26px; font-size: 18px;
+         background: #c0392b; color: #fff; }
+  .mic.rec { background: #e74c3c; animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .6; } }
+  .heard { min-height: 56px; padding: 16px; margin-top: 12px;
+           background: #fffbe6; border-radius: 10px;
+           font-size: 22px; font-weight: 700; text-align: center; }
+  .msg { padding: 12px; border-radius: 10px; font-size: 14px;
+         margin-top: 10px; display: none; }
+  .msg.on { display: block; }
+  .msg.err { background: #fde8e8; color: #c0392b; }
+  .big { font-size: 56px; text-align: center; margin: 30px 0 10px; }
+  .center { text-align: center; }
+  .lock { font-size: 15px; color: #888; margin-top: 16px; }
 </style>
 </head>
 <body>
+<div class="wrap">
 
-<h2>음성인식 환경 진단</h2>
+  <!-- 1. 교사 코드 -->
+  <div class="screen on" id="s-code">
+    <h1>단어 시험</h1>
+    <div class="sub">교사용 코드를 입력하세요</div>
+    <div class="card">
+      <input type="password" id="inCode" inputmode="numeric" placeholder="코드">
+      <button class="btn" id="btnCode">확인</button>
+      <div class="msg err" id="msgCode"></div>
+    </div>
+  </div>
 
-<div class="box" id="env"></div>
+  <!-- 2. 반 / 회차 -->
+  <div class="screen" id="s-setup">
+    <h1>반과 회차 선택</h1>
+    <div class="sub">시험을 진행할 반과 회차를 고르세요</div>
+    <div class="card">
+      <div style="font-size:14px;color:#666;margin-bottom:8px;">반</div>
+      <div class="grid g4" id="clsList"></div>
+    </div>
+    <div class="card">
+      <div style="font-size:14px;color:#666;margin-bottom:8px;">회차</div>
+      <div class="grid g4" id="rndList"></div>
+    </div>
+    <button class="btn" id="btnSetup" disabled>시작</button>
+  </div>
 
-<div class="box">
-  <button id="btnMic">1. 마이크 권한 테스트</button>
-  <button id="btnRec">2. 음성인식 테스트 (영어)</button>
-  <div id="result">—</div>
-  <div id="score"></div>
-</div>
+  <!-- 3. 학생 선택 -->
+  <div class="screen" id="s-pick">
+    <h1 id="pickTitle">학번을 선택하세요</h1>
+    <div class="sub">본인의 번호와 이름을 누르면 시험이 시작됩니다</div>
+    <div class="grid g3" id="stuList"></div>
+    <button class="btn sub2" id="btnBack" style="margin-top:20px;">반·회차 다시 선택</button>
+  </div>
 
-<div class="box">
-  <div style="font-size:13px;color:#666;margin-bottom:6px;">로그</div>
-  <div id="log"></div>
+  <!-- 4. 시험 -->
+  <div class="screen" id="s-test">
+    <div class="prog" id="prog"></div>
+    <div class="card">
+      <span class="qtag" id="qtag"></span>
+      <div class="q" id="qtext"></div>
+      <div class="hint" id="qhint"></div>
+
+      <div id="voiceArea">
+        <button class="mic" id="btnMic">🎤 눌러서 말하기</button>
+        <div class="heard" id="heard">—</div>
+      </div>
+
+      <div id="typeArea">
+        <input type="text" id="inAns" placeholder="답을 입력하세요" autocomplete="off">
+      </div>
+
+      <button class="btn" id="btnNext">제출</button>
+      <div class="msg err" id="msgTest"></div>
+    </div>
+  </div>
+
+  <!-- 5. 결과 -->
+  <div class="screen" id="s-done">
+    <div class="card center">
+      <div class="big" id="doneIcon">✓</div>
+      <h1 id="doneText">제출 완료</h1>
+      <div class="sub" id="doneSub">수고했습니다</div>
+      <div class="lock">잠시 후 다음 학생 화면으로 넘어갑니다…</div>
+    </div>
+  </div>
+
 </div>
 
 <script>
-var logEl = document.getElementById('log');
-function log(msg) {
-  var t = new Date().toLocaleTimeString();
-  logEl.textContent += '[' + t + '] ' + msg + '\n';
-  logEl.scrollTop = logEl.scrollHeight;
-}
-function row(k, v, good) {
-  var cls = good === undefined ? '' : (good ? 'ok' : 'no');
-  return '<div class="row"><span class="k">' + k +
-         '</span><span class="v ' + cls + '">' + v + '</span></div>';
-}
+/* ===== 설정 ===== */
+var API = 'https://script.google.com/macros/s/AKfycbxZmqxYPwDhyaYBAW58gTV5USYEEZ1xLDGbCv3FArF2094jVvA5u5E6RRAGDCBh9sgg4w/exec';
 
-var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-var inIframe = (window.self !== window.top);
-var html = '';
-html += row('SpeechRecognition 지원', SR ? '있음' : '없음', !!SR);
-html += row('getUserMedia 지원',
-            (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) ? '있음' : '없음',
-            !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia));
-html += row('iframe 안', inIframe ? '예' : '아니오', !inIframe);
-html += row('보안 컨텍스트(HTTPS)', window.isSecureContext ? '예' : '아니오',
-            !!window.isSecureContext);
-html += row('브라우저', navigator.userAgent.substring(0, 60) + '…');
-document.getElementById('env').innerHTML = html;
-log('환경 확인 완료. iframe=' + inIframe);
-
-document.getElementById('btnMic').onclick = function() {
-  log('getUserMedia 요청…');
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    log('✗ getUserMedia 자체를 지원하지 않음');
-    return;
-  }
-  navigator.mediaDevices.getUserMedia({ audio: true })
-    .then(function(stream) {
-      log('✓ 마이크 권한 획득 성공');
-      stream.getTracks().forEach(function(t) { t.stop(); });
-    })
-    .catch(function(err) {
-      log('✗ 실패: ' + err.name + ' — ' + err.message);
-    });
+/* ===== 상태 ===== */
+var S = {
+  code: '', cls: '', round: '',
+  id: '', name: '',
+  items: [], idx: 0, details: [], startedAt: 0,
+  heard: '', busy: false
 };
 
-var tried = 0, hit = 0;
-document.getElementById('btnRec').onclick = function() {
-  if (!SR) { log('✗ SpeechRecognition 미지원'); return; }
+/* ===== 통신 ===== */
+function call(action, params) {
+  var body = Object.assign({ action: action, code: S.code }, params || {});
+  return fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body)
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (!d.ok) throw new Error(d.error || '알 수 없는 오류');
+    return d;
+  });
+}
+
+/* ===== 화면 전환 ===== */
+function show(id) {
+  var all = document.querySelectorAll('.screen');
+  for (var i = 0; i < all.length; i++) all[i].classList.remove('on');
+  document.getElementById(id).classList.add('on');
+}
+function err(elId, m) {
+  var el = document.getElementById(elId);
+  if (!m) { el.classList.remove('on'); return; }
+  el.textContent = m;
+  el.classList.add('on');
+}
+
+/* ===== 1. 교사 코드 ===== */
+document.getElementById('btnCode').onclick = function() {
+  var v = document.getElementById('inCode').value.trim();
+  if (!v) return;
+  S.code = v;
+  this.disabled = true;
+  err('msgCode', '');
+  call('init').then(function(d) {
+    buildSetup(d.classes, d.rounds);
+    show('s-setup');
+  }).catch(function(e) {
+    err('msgCode', e.message);
+  }).finally(function() {
+    document.getElementById('btnCode').disabled = false;
+  });
+};
+document.getElementById('inCode').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('btnCode').click();
+});
+
+/* ===== 2. 반 / 회차 ===== */
+function buildSetup(classes, rounds) {
+  var cl = document.getElementById('clsList');
+  var rl = document.getElementById('rndList');
+  cl.innerHTML = ''; rl.innerHTML = '';
+
+  classes.forEach(function(c) {
+    var b = document.createElement('button');
+    b.className = 'chip'; b.textContent = c + '반';
+    b.onclick = function() { S.cls = c; mark(cl, b); checkSetup(); };
+    cl.appendChild(b);
+  });
+  rounds.forEach(function(r) {
+    var b = document.createElement('button');
+    b.className = 'chip'; b.textContent = r + '회차';
+    b.onclick = function() { S.round = r; mark(rl, b); checkSetup(); };
+    rl.appendChild(b);
+  });
+}
+function mark(box, btn) {
+  var bs = box.querySelectorAll('.chip');
+  for (var i = 0; i < bs.length; i++) {
+    bs[i].style.background = '#fff';
+    bs[i].style.color = '#111';
+    bs[i].style.borderColor = '#d0d0d5';
+  }
+  btn.style.background = '#1a73e8';
+  btn.style.color = '#fff';
+  btn.style.borderColor = '#1a73e8';
+}
+function checkSetup() {
+  document.getElementById('btnSetup').disabled = !(S.cls && S.round);
+}
+document.getElementById('btnSetup').onclick = function() {
+  loadRoster();
+};
+
+/* ===== 3. 학생 선택 ===== */
+function loadRoster() {
+  document.getElementById('stuList').innerHTML =
+    '<div style="grid-column:1/-1;color:#888;">불러오는 중…</div>';
+  show('s-pick');
+  document.getElementById('pickTitle').textContent =
+    S.cls + '반 · ' + S.round + '회차';
+
+  call('roster', { cls: S.cls, round: S.round }).then(function(d) {
+    var box = document.getElementById('stuList');
+    box.innerHTML = '';
+    d.students.forEach(function(st) {
+      var b = document.createElement('button');
+      b.className = 'chip stu' + (st.done ? ' done' : '');
+      b.innerHTML = '<span class="no">' + st.id + '</span>' + st.name;
+      if (st.done) { b.disabled = true; }
+      else { b.onclick = function() { startTest(st); }; }
+      box.appendChild(b);
+    });
+  }).catch(function(e) {
+    document.getElementById('stuList').innerHTML =
+      '<div style="grid-column:1/-1;color:#c00;">' + e.message + '</div>';
+  });
+}
+document.getElementById('btnBack').onclick = function() { show('s-setup'); };
+
+/* ===== 4. 시험 ===== */
+function startTest(st) {
+  S.id = st.id; S.name = st.name;
+  S.details = []; S.idx = 0;
+
+  call('start', { round: S.round }).then(function(d) {
+    S.items = d.items;
+    S.startedAt = Date.now();
+    show('s-test');
+    render();
+  }).catch(function(e) {
+    alert(e.message);
+  });
+}
+
+function render() {
+  var it = S.items[S.idx];
+  S.heard = '';
+  err('msgTest', '');
+
+  document.getElementById('prog').textContent =
+    S.name + ' · ' + (S.idx + 1) + ' / ' + S.items.length;
+
+  var tag = document.getElementById('qtag');
+  tag.textContent = it.type;
+  tag.className = 'qtag t-' + it.type;
+
+  var q = document.getElementById('qtext');
+  q.textContent = it.prompt;
+  q.className = 'q' + (it.kind === '문장' ? ' small' : '');
+
+  var voice = (it.type === '발음');
+  document.getElementById('voiceArea').style.display = voice ? 'block' : 'none';
+  document.getElementById('typeArea').style.display  = voice ? 'none' : 'block';
+  document.getElementById('heard').textContent = '—';
+  document.getElementById('inAns').value = '';
+
+  document.getElementById('qhint').textContent =
+    voice   ? '마이크 버튼을 누르고 단어를 읽으세요' :
+    it.kind === '문장' ? '문장의 뜻을 우리말로 쓰세요' :
+                         '단어의 뜻을 우리말로 쓰세요';
+
+  document.getElementById('btnNext').textContent =
+    (S.idx === S.items.length - 1) ? '제출' : '다음';
+
+  if (!voice) setTimeout(function() {
+    document.getElementById('inAns').focus();
+  }, 100);
+}
+
+/* --- 음성 인식 --- */
+var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+document.getElementById('btnMic').onclick = function() {
+  if (!SR) { err('msgTest', '이 브라우저는 음성인식을 지원하지 않습니다.'); return; }
   var btn = this;
   var rec = new SR();
   rec.lang = 'en-US';
   rec.interimResults = true;
-  rec.maxAlternatives = 3;
+  rec.maxAlternatives = 1;
 
   rec.onstart = function() {
-    btn.disabled = true;
-    btn.textContent = '듣는 중… 단어를 말하세요';
-    document.getElementById('result').textContent = '…';
-    log('인식 시작 (lang=en-US)');
+    btn.disabled = true; btn.classList.add('rec');
+    btn.textContent = '🔴 듣는 중…';
+    document.getElementById('heard').textContent = '…';
   };
   rec.onresult = function(e) {
     var r = e.results[e.results.length - 1];
-    document.getElementById('result').textContent = r[0].transcript;
-    if (r.isFinal) {
-      tried++;
-      var c = r[0].confidence || 0;
-      if (c >= 0.6) hit++;
-      for (var i = 0; i < r.length; i++) {
-        log('후보' + (i + 1) + ': "' + r[i].transcript +
-            '" (정확도 ' + (r[i].confidence || 0).toFixed(2) + ')');
-      }
-      document.getElementById('score').textContent =
-        '누적: ' + tried + '회 중 정확도 0.6 이상 ' + hit + '회';
-    }
+    document.getElementById('heard').textContent = r[0].transcript;
+    if (r.isFinal) S.heard = r[0].transcript;
   };
-  rec.onerror = function(e) {
-    log('✗ 오류: ' + e.error + (e.message ? ' — ' + e.message : ''));
-  };
+  rec.onerror = function(e) { err('msgTest', '인식 오류: ' + e.error); };
   rec.onend = function() {
-    btn.disabled = false;
-    btn.textContent = '2. 음성인식 테스트 (영어)';
-    log('인식 종료');
+    btn.disabled = false; btn.classList.remove('rec');
+    btn.textContent = '🎤 다시 말하기';
   };
-
-  try { rec.start(); }
-  catch (err) { log('✗ start() 예외: ' + err.message); }
+  try { rec.start(); } catch (e) { err('msgTest', e.message); }
 };
+
+/* --- 제출 --- */
+document.getElementById('btnNext').onclick = function() {
+  if (S.busy) return;
+  var it = S.items[S.idx];
+  var given = (it.type === '발음')
+    ? S.heard
+    : document.getElementById('inAns').value.trim();
+
+  if (!given) { err('msgTest', '답을 입력하거나 말해주세요.'); return; }
+
+  S.busy = true;
+  this.disabled = true;
+  this.textContent = '채점 중…';
+
+  call('grade', { answer: given, truth: it.answer, allow: it.allow })
+    .then(function(d) {
+      S.details.push({
+        kind: it.kind, type: it.type, prompt: it.prompt,
+        answer: it.answer, given: given,
+        correct: d.correct, reason: d.reason
+      });
+      S.idx++;
+      S.busy = false;
+      document.getElementById('btnNext').disabled = false;
+      if (S.idx < S.items.length) { render(); }
+      else { submitAll(); }
+    })
+    .catch(function(e) {
+      S.busy = false;
+      document.getElementById('btnNext').disabled = false;
+      document.getElementById('btnNext').textContent = '제출';
+      err('msgTest', e.message);
+    });
+};
+
+/* ===== 5. 제출 & 복귀 ===== */
+function submitAll() {
+  show('s-done');
+  var ok = S.details.filter(function(d) { return d.correct; }).length;
+  var all = S.details.length;
+  document.getElementById('doneIcon').textContent = (ok === all) ? '✓' : '○';
+  document.getElementById('doneText').textContent = '제출 완료';
+  document.getElementById('doneSub').textContent =
+    ok + ' / ' + all + ' 정답';
+
+  call('submit', {
+    round: S.round, id: S.id, name: S.name, cls: S.cls,
+    elapsed: Math.round((Date.now() - S.startedAt) / 1000),
+    details: S.details
+  }).catch(function(e) {
+    document.getElementById('doneSub').textContent = '저장 실패: ' + e.message;
+  }).finally(function() {
+    setTimeout(function() { loadRoster(); }, 2500);
+  });
+}
+
+/* ===== 이탈 방지 ===== */
+history.pushState(null, '', location.href);
+window.addEventListener('popstate', function() {
+  history.pushState(null, '', location.href);
+});
+window.addEventListener('beforeunload', function(e) {
+  if (document.getElementById('s-test').classList.contains('on')) {
+    e.preventDefault(); e.returnValue = '';
+  }
+});
+document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 </script>
 </body>
 </html>
