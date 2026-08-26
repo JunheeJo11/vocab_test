@@ -20,22 +20,42 @@
   input[type=text], input[type=password] {
     width: 100%; padding: 14px; font-size: 17px;
     border: 1.5px solid #d0d0d5; border-radius: 10px; }
+
+  /* --- 버튼 공통 + 눌림 효과 --- */
   button { border: none; border-radius: 12px; font-weight: 600;
-           font-family: inherit; cursor: pointer; }
+           font-family: inherit; cursor: pointer;
+           transition: transform .08s ease, filter .08s ease,
+                       background .15s ease, color .15s ease,
+                       border-color .15s ease; }
+  button:active:not(:disabled) { transform: scale(.955); filter: brightness(.9); }
+  button:disabled { cursor: default; }
+
   .btn { width: 100%; padding: 16px; font-size: 17px;
          background: #1a73e8; color: #fff; margin-top: 10px; }
   .btn:disabled { background: #b8b8bd; }
   .btn.sub2 { background: #e8e8ed; color: #333; }
   .grid { display: grid; gap: 10px; }
-  .g2 { grid-template-columns: repeat(2, 1fr); }
   .g3 { grid-template-columns: repeat(3, 1fr); }
   .g4 { grid-template-columns: repeat(4, 1fr); }
   .chip { padding: 18px 8px; font-size: 17px; background: #fff;
-          border: 1.5px solid #d0d0d5; border-radius: 12px; text-align: center; }
+          border: 1.5px solid #d0d0d5; border-radius: 12px; text-align: center;
+          color: #111; }
+  .chip.sel { background: #1a73e8; border-color: #1a73e8; color: #fff; }
+  .chip.sel .no { color: #cfe0fb; }
   .chip.done { background: #f0f0f2; color: #b0b0b5;
                text-decoration: line-through; border-color: #e5e5ea; }
   .stu { padding: 16px 8px; font-size: 16px; }
   .stu .no { display: block; font-size: 12px; color: #888; margin-bottom: 3px; }
+
+  /* --- 스피너 --- */
+  .spin { display: inline-block; width: 15px; height: 15px;
+          margin-right: 8px; vertical-align: -2px;
+          border: 2.5px solid rgba(255,255,255,.35);
+          border-top-color: #fff; border-radius: 50%;
+          animation: rot .7s linear infinite; }
+  .spin.dark { border-color: rgba(0,0,0,.18); border-top-color: #666; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+
   .prog { font-size: 13px; color: #666; margin-bottom: 8px; }
   .qtag { display: inline-block; font-size: 12px; font-weight: 700;
           padding: 5px 12px; border-radius: 20px; margin-bottom: 14px; }
@@ -60,6 +80,14 @@
   .big { font-size: 56px; text-align: center; margin: 30px 0 10px; }
   .center { text-align: center; }
   .lock { font-size: 15px; color: #888; margin-top: 16px; }
+  .cf-id { font-size: 17px; color: #888; text-align: center; margin-top: 24px; }
+  .cf-name { font-size: 46px; font-weight: 800; text-align: center;
+             margin: 6px 0 30px; letter-spacing: 2px; }
+  .cf-btns { display: grid; grid-template-columns: 1fr 1.4fr; gap: 12px; }
+  .cf-btns button { padding: 20px; font-size: 18px; margin: 0; }
+  .cf-no { background: #e8e8ed; color: #444; }
+  .cf-yes { background: #1a73e8; color: #fff; }
+  .cf-yes:disabled { background: #8fb4ea; }
 </style>
 </head>
 <body>
@@ -70,7 +98,7 @@
     <h1>단어 시험</h1>
     <div class="sub">교사용 코드를 입력하세요</div>
     <div class="card">
-      <input type="password" id="inCode" inputmode="numeric" placeholder="코드">
+      <input type="password" id="inCode" placeholder="코드">
       <button class="btn" id="btnCode">확인</button>
       <div class="msg err" id="msgCode"></div>
     </div>
@@ -94,9 +122,23 @@
   <!-- 3. 학생 선택 -->
   <div class="screen" id="s-pick">
     <h1 id="pickTitle">학번을 선택하세요</h1>
-    <div class="sub">본인의 번호와 이름을 누르면 시험이 시작됩니다</div>
+    <div class="sub">본인의 번호와 이름을 누르세요</div>
     <div class="grid g3" id="stuList"></div>
     <button class="btn sub2" id="btnBack" style="margin-top:20px;">반·회차 다시 선택</button>
+  </div>
+
+  <!-- 3-1. 본인 확인 -->
+  <div class="screen" id="s-confirm">
+    <div class="card">
+      <div class="center sub" style="margin:0;">본인이 맞습니까?</div>
+      <div class="cf-id" id="cfId"></div>
+      <div class="cf-name" id="cfName"></div>
+      <div class="cf-btns">
+        <button class="cf-no"  id="btnNo">아니오</button>
+        <button class="cf-yes" id="btnYes">시작하기</button>
+      </div>
+      <div class="msg err" id="msgConfirm"></div>
+    </div>
   </div>
 
   <!-- 4. 시험 -->
@@ -145,6 +187,9 @@ var S = {
   heard: '', busy: false
 };
 
+/* iOS 사파리에서 :active 효과를 켜기 위한 빈 리스너 */
+document.addEventListener('touchstart', function() {}, { passive: true });
+
 /* ===== 통신 ===== */
 function call(action, params) {
   var body = Object.assign({ action: action, code: S.code }, params || {});
@@ -169,13 +214,18 @@ function err(elId, m) {
   el.textContent = m;
   el.classList.add('on');
 }
+function busyBtn(el, text, dark) {
+  el.disabled = true;
+  el.innerHTML = '<span class="spin' + (dark ? ' dark' : '') + '"></span>' + text;
+}
 
 /* ===== 1. 교사 코드 ===== */
 document.getElementById('btnCode').onclick = function() {
   var v = document.getElementById('inCode').value.trim();
   if (!v) return;
   S.code = v;
-  this.disabled = true;
+  var btn = this;
+  busyBtn(btn, '확인 중…');
   err('msgCode', '');
   call('init').then(function(d) {
     buildSetup(d.classes, d.rounds);
@@ -183,7 +233,8 @@ document.getElementById('btnCode').onclick = function() {
   }).catch(function(e) {
     err('msgCode', e.message);
   }).finally(function() {
-    document.getElementById('btnCode').disabled = false;
+    btn.disabled = false;
+    btn.textContent = '확인';
   });
 };
 document.getElementById('inCode').addEventListener('keydown', function(e) {
@@ -211,26 +262,19 @@ function buildSetup(classes, rounds) {
 }
 function mark(box, btn) {
   var bs = box.querySelectorAll('.chip');
-  for (var i = 0; i < bs.length; i++) {
-    bs[i].style.background = '#fff';
-    bs[i].style.color = '#111';
-    bs[i].style.borderColor = '#d0d0d5';
-  }
-  btn.style.background = '#1a73e8';
-  btn.style.color = '#fff';
-  btn.style.borderColor = '#1a73e8';
+  for (var i = 0; i < bs.length; i++) bs[i].classList.remove('sel');
+  btn.classList.add('sel');
 }
 function checkSetup() {
   document.getElementById('btnSetup').disabled = !(S.cls && S.round);
 }
-document.getElementById('btnSetup').onclick = function() {
-  loadRoster();
-};
+document.getElementById('btnSetup').onclick = function() { loadRoster(); };
 
 /* ===== 3. 학생 선택 ===== */
 function loadRoster() {
   document.getElementById('stuList').innerHTML =
-    '<div style="grid-column:1/-1;color:#888;">불러오는 중…</div>';
+    '<div style="grid-column:1/-1;color:#888;padding:14px 0;">' +
+    '<span class="spin dark"></span>불러오는 중…</div>';
   show('s-pick');
   document.getElementById('pickTitle').textContent =
     S.cls + '반 · ' + S.round + '회차';
@@ -243,7 +287,7 @@ function loadRoster() {
       b.className = 'chip stu' + (st.done ? ' done' : '');
       b.innerHTML = '<span class="no">' + st.id + '</span>' + st.name;
       if (st.done) { b.disabled = true; }
-      else { b.onclick = function() { startTest(st); }; }
+      else { b.onclick = function() { mark(box, b); askConfirm(st); }; }
       box.appendChild(b);
     });
   }).catch(function(e) {
@@ -253,21 +297,37 @@ function loadRoster() {
 }
 document.getElementById('btnBack').onclick = function() { show('s-setup'); };
 
-/* ===== 4. 시험 ===== */
-function startTest(st) {
+/* ===== 3-1. 본인 확인 ===== */
+function askConfirm(st) {
   S.id = st.id; S.name = st.name;
-  S.details = []; S.idx = 0;
+  document.getElementById('cfId').textContent = st.id;
+  document.getElementById('cfName').textContent = st.name;
+  err('msgConfirm', '');
+  var y = document.getElementById('btnYes');
+  y.disabled = false;
+  y.textContent = '시작하기';
+  show('s-confirm');
+}
+document.getElementById('btnNo').onclick = function() { show('s-pick'); };
+document.getElementById('btnYes').onclick = function() {
+  var btn = this;
+  busyBtn(btn, '준비 중…');
+  err('msgConfirm', '');
 
   call('start', { round: S.round }).then(function(d) {
     S.items = d.items;
+    S.details = []; S.idx = 0;
     S.startedAt = Date.now();
     show('s-test');
     render();
   }).catch(function(e) {
-    alert(e.message);
+    err('msgConfirm', e.message);
+    btn.disabled = false;
+    btn.textContent = '시작하기';
   });
-}
+};
 
+/* ===== 4. 시험 ===== */
 function render() {
   var it = S.items[S.idx];
   S.heard = '';
@@ -289,14 +349,16 @@ function render() {
   document.getElementById('typeArea').style.display  = voice ? 'none' : 'block';
   document.getElementById('heard').textContent = '—';
   document.getElementById('inAns').value = '';
+  document.getElementById('btnMic').textContent = '🎤 눌러서 말하기';
 
   document.getElementById('qhint').textContent =
     voice   ? '마이크 버튼을 누르고 단어를 읽으세요' :
     it.kind === '문장' ? '문장의 뜻을 우리말로 쓰세요' :
                          '단어의 뜻을 우리말로 쓰세요';
 
-  document.getElementById('btnNext').textContent =
-    (S.idx === S.items.length - 1) ? '제출' : '다음';
+  var nx = document.getElementById('btnNext');
+  nx.disabled = false;
+  nx.textContent = (S.idx === S.items.length - 1) ? '제출' : '다음';
 
   if (!voice) setTimeout(function() {
     document.getElementById('inAns').focus();
@@ -342,10 +404,12 @@ document.getElementById('btnNext').onclick = function() {
   if (!given) { err('msgTest', '답을 입력하거나 말해주세요.'); return; }
 
   S.busy = true;
-  this.disabled = true;
-  this.textContent = '채점 중…';
+  busyBtn(this, '채점 중…');
 
-  call('grade', { answer: given, truth: it.answer, allow: it.allow })
+  call('grade', {
+    answer: given, truth: it.answer, allow: it.allow,
+    prompt: it.prompt, kind: it.kind, type: it.type
+  })
     .then(function(d) {
       S.details.push({
         kind: it.kind, type: it.type, prompt: it.prompt,
@@ -354,14 +418,14 @@ document.getElementById('btnNext').onclick = function() {
       });
       S.idx++;
       S.busy = false;
-      document.getElementById('btnNext').disabled = false;
       if (S.idx < S.items.length) { render(); }
       else { submitAll(); }
     })
     .catch(function(e) {
       S.busy = false;
-      document.getElementById('btnNext').disabled = false;
-      document.getElementById('btnNext').textContent = '제출';
+      var nx = document.getElementById('btnNext');
+      nx.disabled = false;
+      nx.textContent = (S.idx === S.items.length - 1) ? '제출' : '다음';
       err('msgTest', e.message);
     });
 };
@@ -373,8 +437,7 @@ function submitAll() {
   var all = S.details.length;
   document.getElementById('doneIcon').textContent = (ok === all) ? '✓' : '○';
   document.getElementById('doneText').textContent = '제출 완료';
-  document.getElementById('doneSub').textContent =
-    ok + ' / ' + all + ' 정답';
+  document.getElementById('doneSub').textContent = ok + ' / ' + all + ' 정답';
 
   call('submit', {
     round: S.round, id: S.id, name: S.name, cls: S.cls,
