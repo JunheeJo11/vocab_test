@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>음성인식 진단</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+         padding: 16px; margin: 0; background: #f5f5f7; }
+  h2 { font-size: 18px; margin: 0 0 12px; }
+  .box { background: #fff; border-radius: 10px; padding: 14px;
+         margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .row { display: flex; justify-content: space-between;
+         padding: 5px 0; font-size: 14px; border-bottom: 1px solid #eee; }
+  .row:last-child { border-bottom: none; }
+  .k { color: #666; }
+  .v { font-weight: 600; text-align: right; word-break: break-all; }
+  .ok { color: #0a7d2b; }
+  .no { color: #c00; }
+  button { width: 100%; padding: 14px; font-size: 16px; font-weight: 600;
+           border: none; border-radius: 10px; background: #1a73e8;
+           color: #fff; margin-bottom: 8px; }
+  button:disabled { background: #aaa; }
+  #result { font-size: 22px; font-weight: 700; min-height: 34px;
+            padding: 10px; background: #fffbe6; border-radius: 8px; }
+  #score { font-size: 13px; color: #666; margin-top: 6px; }
+  #log { font-family: monospace; font-size: 12px; white-space: pre-wrap;
+         background: #1e1e1e; color: #ddd; padding: 10px;
+         border-radius: 8px; height: 200px; overflow-y: auto; }
+</style>
+</head>
+<body>
+
+<h2>음성인식 환경 진단</h2>
+
+<div class="box" id="env"></div>
+
+<div class="box">
+  <button id="btnMic">1. 마이크 권한 테스트</button>
+  <button id="btnRec">2. 음성인식 테스트 (영어)</button>
+  <div id="result">—</div>
+  <div id="score"></div>
+</div>
+
+<div class="box">
+  <div style="font-size:13px;color:#666;margin-bottom:6px;">로그</div>
+  <div id="log"></div>
+</div>
+
+<script>
+var logEl = document.getElementById('log');
+function log(msg) {
+  var t = new Date().toLocaleTimeString();
+  logEl.textContent += '[' + t + '] ' + msg + '\n';
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function row(k, v, good) {
+  var cls = good === undefined ? '' : (good ? 'ok' : 'no');
+  return '<div class="row"><span class="k">' + k +
+         '</span><span class="v ' + cls + '">' + v + '</span></div>';
+}
+
+var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+var inIframe = (window.self !== window.top);
+var html = '';
+html += row('SpeechRecognition 지원', SR ? '있음' : '없음', !!SR);
+html += row('getUserMedia 지원',
+            (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) ? '있음' : '없음',
+            !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia));
+html += row('iframe 안', inIframe ? '예' : '아니오', !inIframe);
+html += row('보안 컨텍스트(HTTPS)', window.isSecureContext ? '예' : '아니오',
+            !!window.isSecureContext);
+html += row('브라우저', navigator.userAgent.substring(0, 60) + '…');
+document.getElementById('env').innerHTML = html;
+log('환경 확인 완료. iframe=' + inIframe);
+
+document.getElementById('btnMic').onclick = function() {
+  log('getUserMedia 요청…');
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    log('✗ getUserMedia 자체를 지원하지 않음');
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then(function(stream) {
+      log('✓ 마이크 권한 획득 성공');
+      stream.getTracks().forEach(function(t) { t.stop(); });
+    })
+    .catch(function(err) {
+      log('✗ 실패: ' + err.name + ' — ' + err.message);
+    });
+};
+
+var tried = 0, hit = 0;
+document.getElementById('btnRec').onclick = function() {
+  if (!SR) { log('✗ SpeechRecognition 미지원'); return; }
+  var btn = this;
+  var rec = new SR();
+  rec.lang = 'en-US';
+  rec.interimResults = true;
+  rec.maxAlternatives = 3;
+
+  rec.onstart = function() {
+    btn.disabled = true;
+    btn.textContent = '듣는 중… 단어를 말하세요';
+    document.getElementById('result').textContent = '…';
+    log('인식 시작 (lang=en-US)');
+  };
+  rec.onresult = function(e) {
+    var r = e.results[e.results.length - 1];
+    document.getElementById('result').textContent = r[0].transcript;
+    if (r.isFinal) {
+      tried++;
+      var c = r[0].confidence || 0;
+      if (c >= 0.6) hit++;
+      for (var i = 0; i < r.length; i++) {
+        log('후보' + (i + 1) + ': "' + r[i].transcript +
+            '" (정확도 ' + (r[i].confidence || 0).toFixed(2) + ')');
+      }
+      document.getElementById('score').textContent =
+        '누적: ' + tried + '회 중 정확도 0.6 이상 ' + hit + '회';
+    }
+  };
+  rec.onerror = function(e) {
+    log('✗ 오류: ' + e.error + (e.message ? ' — ' + e.message : ''));
+  };
+  rec.onend = function() {
+    btn.disabled = false;
+    btn.textContent = '2. 음성인식 테스트 (영어)';
+    log('인식 종료');
+  };
+
+  try { rec.start(); }
+  catch (err) { log('✗ start() 예외: ' + err.message); }
+};
+</script>
+</body>
+</html>
